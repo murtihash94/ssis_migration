@@ -1,0 +1,18 @@
+resources:
+  jobs:
+    ssis_migration_job:
+      name: SSIS Migration Job
+      tasks:
+      - task_key: run_dlt_pipeline
+        depends_on: []
+        pipeline_task:
+          pipeline_id: ${resources.pipelines.ssis_dlt_pipeline.id}
+  pipelines:
+    ssis_dlt_pipeline:
+      name: SSIS DLT Pipeline
+      target: dev
+      libraries:
+      - notebook:
+          path: ./notebooks/dlt_pipeline
+      configuration:
+        pipeline.progress_reporting: 'true'
