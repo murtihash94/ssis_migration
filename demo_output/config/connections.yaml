@@ -1,0 +1,29 @@
+connections:
+  s22_adm:
+    driver: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    properties:
+      password: ${secrets/scope/password}
+      user: ${secrets/scope/username}
+    type: jdbc
+    url: jdbc:sqlserver://.:1433;databaseName=S22_ADM
+  s22_dwh:
+    driver: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    properties:
+      password: ${secrets/scope/password}
+      user: ${secrets/scope/username}
+    type: jdbc
+    url: jdbc:sqlserver://.:1433;databaseName=S22_DWH
+  s22_ods:
+    driver: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    properties:
+      password: ${secrets/scope/password}
+      user: ${secrets/scope/username}
+    type: jdbc
+    url: jdbc:sqlserver://.:1433;databaseName=S22_ODS
+  s22_sta:
+    driver: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    properties:
+      password: ${secrets/scope/password}
+      user: ${secrets/scope/username}
+    type: jdbc
+    url: jdbc:sqlserver://.:1433;databaseName=S22_STA

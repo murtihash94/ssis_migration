@@ -1,0 +1,4 @@
+source_table,source_file,source_column,target_table,target_column,data_type,transformation_rule,validation_name,transformation_name,is_derived
+[dbo].[Customers],,ID,3,ID,Integer,,,,False
+[dbo].[Customers],,Name,3,Name,String,,,,False
+[dbo].[Customers],,CreatedDate,3,LoadDate,Timestamp,,,,False
