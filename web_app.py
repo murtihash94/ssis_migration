@@ -222,5 +222,8 @@ if __name__ == '__main__':
     # Setup logging
     logging.basicConfig(level=logging.INFO)
     
+    # Get port from environment variable, default to 8080 to avoid common conflicts
+    port = int(os.environ.get('FLASK_PORT', 8080))
+    
     # Run Flask app
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=port)
