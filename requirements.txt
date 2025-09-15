@@ -6,3 +6,5 @@ click>=8.1.0
 pathlib>=1.0.1
 dataclasses>=0.6
 typing-extensions>=4.0.0
+flask>=2.3.0
+werkzeug>=2.3.0
