@@ -21,6 +21,13 @@ A comprehensive framework for migrating SSIS packages to Databricks workflows wi
   - Data extraction notebooks
   - Configuration files
 
+- **🆕 Web Application**:
+  - User-friendly web interface
+  - Drag-and-drop file upload
+  - Real-time migration progress
+  - Tabbed results display
+  - Download generated files
+
 ## Installation
 
 ```bash
@@ -29,6 +36,24 @@ python setup.py install
 ```
 
 ## Usage
+
+### Option 1: Web Application (Recommended)
+
+Start the web application for an easy-to-use interface:
+
+```bash
+python start_webapp.py
+```
+
+Then open your browser and navigate to `http://localhost:5000`
+
+Features:
+- Upload SSIS files via drag-and-drop interface
+- View migration progress in real-time
+- Browse results in organized tabs
+- Download individual files or complete migration package
+
+### Option 2: Command Line Interface
 
 ```bash
 # Migrate entire SSIS project
