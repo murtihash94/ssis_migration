@@ -35,9 +35,13 @@ def main():
     if not check_dependencies():
         sys.exit(1)
     
+    # Get port from environment variable, default to 8080 to avoid common conflicts
+    port = int(os.environ.get('FLASK_PORT', 8080))
+    
     print("📂 Starting web application...")
-    print("🌐 Open your browser and navigate to: http://localhost:5000")
+    print(f"🌐 Open your browser and navigate to: http://localhost:{port}")
     print("🛑 Press Ctrl+C to stop the server")
+    print(f"💡 To use a different port, set FLASK_PORT environment variable (e.g., FLASK_PORT=3000)")
     print("-" * 50)
     
     try:
