@@ -157,6 +157,18 @@ def view_results(session_id):
         workflow_file = session_output_dir / "workflows" / "databricks_workflow.yml"
         if workflow_file.exists():
             results_data['workflow_yaml'] = workflow_file.read_text()
+        
+        # Load DAG visualization data
+        dag_json_file = session_output_dir / "dag" / "dag_data.json"
+        if dag_json_file.exists():
+            import json
+            with open(dag_json_file, 'r') as f:
+                results_data['dag_data'] = json.load(f)
+        
+        # Load DAG HTML
+        dag_html_file = session_output_dir / "dag" / "dag_visualization.html"
+        if dag_html_file.exists():
+            results_data['dag_html'] = dag_html_file.read_text()
             
     except Exception as e:
         app.logger.error(f"Error loading results for session {session_id}: {str(e)}")

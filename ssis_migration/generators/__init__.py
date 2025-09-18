@@ -2,5 +2,6 @@
 
 from .sttm_generator import STTMGenerator
 from .databricks_generator import DatabricksWorkflowGenerator
+from .dag_generator import DAGGenerator
 
-__all__ = ["STTMGenerator", "DatabricksWorkflowGenerator"]
+__all__ = ["STTMGenerator", "DatabricksWorkflowGenerator", "DAGGenerator"]

@@ -12,6 +12,7 @@ from ..models import SSISPackage, SourceTargetMapping
 from ..parsers.ssis_parser import SSISPackageParser
 from ..generators.sttm_generator import STTMGenerator
 from ..generators.databricks_generator import DatabricksWorkflowGenerator
+from ..generators.dag_generator import DAGGenerator
 from ..validators.sttm_validator import STTMValidator
 
 
@@ -41,6 +42,7 @@ class SSISMigrationAgent:
         self.sttm_generator = STTMGenerator()
         self.validator = STTMValidator() if validate_mappings else None
         self.databricks_generator = DatabricksWorkflowGenerator()
+        self.dag_generator = DAGGenerator()
         
         # Setup logging
         self._setup_logging()
@@ -90,6 +92,11 @@ class SSISMigrationAgent:
             # Module 3: Generate Databricks assets
             self.logger.info("Module 3: Generating Databricks workflows")
             output_files = self._generate_databricks_assets()
+            
+            # Module 4: Generate DAG visualization
+            self.logger.info("Module 4: Generating DAG visualization")
+            dag_files = self._generate_dag_visualization()
+            output_files.update(dag_files)
             
             self.logger.info("Migration completed successfully")
             return output_files
@@ -239,6 +246,29 @@ class SSISMigrationAgent:
         sttm_path = self.output_path / "mappings" / "source_target_mapping.csv"
         self._save_sttm_to_csv(sttm_path)
         output_files['sttm'] = str(sttm_path)
+        
+        return output_files
+    
+    def _generate_dag_visualization(self) -> Dict[str, str]:
+        """Generate DAG visualization files"""
+        output_files = {}
+        
+        # Generate DAG data
+        dag_data = self.dag_generator.generate_dag_data(self.packages)
+        
+        # Save DAG data as JSON
+        dag_json_path = self.output_path / "dag" / "dag_data.json"
+        dag_json_path.parent.mkdir(parents=True, exist_ok=True)
+        self.dag_generator.save_dag_data(dag_data, dag_json_path.parent)
+        output_files['dag_data'] = str(dag_json_path)
+        
+        # Generate DAG HTML visualization
+        dag_html_content = self.dag_generator.generate_dag_html(dag_data)
+        dag_html_path = self.output_path / "dag" / "dag_visualization.html"
+        dag_html_path.write_text(dag_html_content)
+        output_files['dag_html'] = str(dag_html_path)
+        
+        self.logger.info(f"Generated DAG with {dag_data['stats']['total_nodes']} nodes and {dag_data['stats']['total_edges']} edges")
         
         return output_files
         

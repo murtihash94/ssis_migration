@@ -126,6 +126,14 @@
                         </button>
                     </li>
                     {% endif %}
+                    {% if results.dag_data %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="dag-tab" data-bs-toggle="tab" 
+                                data-bs-target="#dag" type="button" role="tab">
+                            <i class="fas fa-sitemap"></i> Dependencies DAG
+                        </button>
+                    </li>
+                    {% endif %}
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="files-tab" data-bs-toggle="tab" 
                                 data-bs-target="#files" type="button" role="tab">
@@ -188,6 +196,83 @@
                             </div>
                             <div class="card-body p-0">
                                 <pre class="m-0"><code id="workflow-code" class="language-yaml">{{ results.workflow_yaml }}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- DAG Visualization Tab -->
+                    {% if results.dag_data %}
+                    <div class="tab-pane fade" id="dag" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-sitemap"></i> Dependencies DAG Visualization</h5>
+                                <p class="mb-0 text-muted">Interactive visualization showing package dependencies and data flow relationships</p>
+                            </div>
+                            <div class="card-body">
+                                <div id="dag-network" style="width: 100%; height: 600px; border: 1px solid #ccc; margin-bottom: 20px;"></div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6><i class="fas fa-info-circle"></i> DAG Statistics</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Total Nodes:</small>
+                                                        <div class="fw-bold">{{ results.dag_data.stats.total_nodes }}</div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Total Edges:</small>
+                                                        <div class="fw-bold">{{ results.dag_data.stats.total_edges }}</div>
+                                                    </div>
+                                                </div>
+                                                <div class="row mt-2">
+                                                    <div class="col-12">
+                                                        <small class="text-muted">Packages:</small>
+                                                        <div class="fw-bold">{{ results.dag_data.stats.packages|length }}</div>
+                                                    </div>
+                                                </div>
+                                                {% if results.dag_data.stats.node_types %}
+                                                <div class="row mt-2">
+                                                    <div class="col-12">
+                                                        <small class="text-muted">Node Types:</small>
+                                                        {% for node_type, count in results.dag_data.stats.node_types.items() %}
+                                                        <span class="badge bg-secondary me-1">{{ node_type }}: {{ count }}</span>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6><i class="fas fa-palette"></i> Legend</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                                    <span class="badge" style="background-color: #4a90e2;">Package</span>
+                                                    <span class="badge" style="background-color: #f39c12;">Data Flow</span>
+                                                    <span class="badge" style="background-color: #27ae60;">Source</span>
+                                                    <span class="badge" style="background-color: #e74c3c;">Destination</span>
+                                                    <span class="badge" style="background-color: #3498db;">Transformation</span>
+                                                </div>
+                                                <div class="mt-2">
+                                                    <small class="text-muted">Edge Types:</small>
+                                                    <div class="d-flex flex-wrap gap-2">
+                                                        <span class="badge" style="background-color: #2c3e50;">Control Flow</span>
+                                                        <span class="badge" style="background-color: #e74c3c;">Data Flow</span>
+                                                        <span class="badge" style="background-color: #8e44ad;">Package Dependency</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -259,6 +344,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script>
         function copyToClipboard(elementId) {
             const element = document.getElementById(elementId);
@@ -275,6 +361,148 @@
                 }, 2000);
             });
         }
+
+        // DAG Visualization
+        {% if results.dag_data %}
+        let dagNetwork = null;
+        
+        function initDAGVisualization() {
+            // DAG data from server
+            const dagData = {{ results.dag_data | tojson }};
+            
+            // Create network
+            const nodes = new vis.DataSet(dagData.nodes);
+            const edges = new vis.DataSet(dagData.edges);
+            
+            const container = document.getElementById('dag-network');
+            const data = { nodes: nodes, edges: edges };
+            const options = {
+                layout: {
+                    hierarchical: {
+                        enabled: true,
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        nodeSpacing: 150,
+                        levelSeparation: 100
+                    }
+                },
+                physics: {
+                    hierarchicalRepulsion: {
+                        centralGravity: 0.3,
+                        springLength: 100,
+                        springConstant: 0.01,
+                        nodeDistance: 120,
+                        damping: 0.09
+                    },
+                    maxVelocity: 50,
+                    solver: 'hierarchicalRepulsion',
+                    timestep: 0.35,
+                    stabilization: {iterations: 150}
+                },
+                nodes: {
+                    font: {
+                        size: 12,
+                        color: '#000000'
+                    },
+                    margin: 10,
+                    borderWidth: 2,
+                    shadow: true,
+                    chosen: {
+                        node: function(values, id, selected, hovering) {
+                            values.shadowColor = '#2c3e50';
+                            values.shadowSize = 10;
+                        }
+                    }
+                },
+                edges: {
+                    font: {
+                        size: 10,
+                        align: 'middle'
+                    },
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 0.8
+                        }
+                    },
+                    smooth: {
+                        type: 'cubicBezier',
+                        forceDirection: 'vertical',
+                        roundness: 0.4
+                    },
+                    chosen: {
+                        edge: function(values, id, selected, hovering) {
+                            values.width = values.width * 2;
+                        }
+                    }
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true,
+                    selectConnectedEdges: true,
+                    hover: true,
+                    tooltipDelay: 200
+                }
+            };
+            
+            dagNetwork = new vis.Network(container, data, options);
+            
+            // Add event listeners
+            dagNetwork.on('selectNode', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = nodes.get(nodeId);
+                    console.log('Selected node:', node);
+                    
+                    // Show node details (optional)
+                    showNodeDetails(node);
+                }
+            });
+            
+            dagNetwork.on('hoverNode', function(params) {
+                const nodeId = params.node;
+                const node = nodes.get(nodeId);
+                // Could add custom tooltip here
+            });
+            
+            dagNetwork.on('selectEdge', function(params) {
+                if (params.edges.length > 0) {
+                    const edgeId = params.edges[0];
+                    const edge = edges.get(edgeId);
+                    console.log('Selected edge:', edge);
+                }
+            });
+        }
+        
+        function showNodeDetails(node) {
+            // Could show a modal or tooltip with node details
+            let details = `Node: ${node.label}\\nType: ${node.type}`;
+            if (node.creation_name) {
+                details += `\\nCreation: ${node.creation_name}`;
+            }
+            if (node.package) {
+                details += `\\nPackage: ${node.package}`;
+            }
+            // For now, just log to console
+            console.log(details);
+        }
+        
+        // Initialize DAG when the tab is shown
+        document.addEventListener('shown.bs.tab', function (e) {
+            if (e.target.id === 'dag-tab' && dagNetwork === null) {
+                setTimeout(initDAGVisualization, 100); // Small delay to ensure DOM is ready
+            }
+        });
+        
+        // Also initialize if DAG tab is active by default
+        document.addEventListener('DOMContentLoaded', function() {
+            const dagTab = document.getElementById('dag-tab');
+            if (dagTab && dagTab.classList.contains('active')) {
+                setTimeout(initDAGVisualization, 100);
+            }
+        });
+        {% endif %}
     </script>
 </body>
 </html>
