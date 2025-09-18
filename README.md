@@ -21,11 +21,17 @@ A comprehensive framework for migrating SSIS packages to Databricks workflows wi
   - Data extraction notebooks
   - Configuration files
 
+- **🆕 Dependencies DAG Visualization**:
+  - Interactive Directed Acyclic Graph showing package dependencies
+  - Visual representation of control flow, data flow, and package dependencies  
+  - Color-coded nodes for different component types
+  - Statistics and legend for easy interpretation
+
 - **🆕 Web Application**:
   - User-friendly web interface
   - Drag-and-drop file upload
   - Real-time migration progress
-  - Tabbed results display
+  - Tabbed results display with DAG visualization
   - Download generated files
 
 ## Installation
@@ -50,7 +56,8 @@ Then open your browser and navigate to `http://localhost:5000`
 Features:
 - Upload SSIS files via drag-and-drop interface
 - View migration progress in real-time
-- Browse results in organized tabs
+- Browse results in organized tabs including DAG visualization
+- Interactive dependency graph showing package relationships
 - Download individual files or complete migration package
 
 ### Option 2: Command Line Interface
@@ -72,6 +79,7 @@ ssis-migrate --project-path . --sttm-only --output ./mappings.csv
 2. **Generate STTM**: Create source-to-target mappings
 3. **Validate Mappings**: Flag areas needing human review
 4. **Generate Databricks Assets**: Create notebooks, workflows, and configurations
+5. **Generate DAG Visualization**: Create interactive dependency graphs
 
 ## Output Structure
 
@@ -85,9 +93,12 @@ databricks_output/
 │   └── post_processing/
 ├── workflows/
 │   └── databricks_workflow.yml
-└── config/
-    ├── connections.yaml
-    └── parameters.yaml
+├── config/
+│   ├── connections.yaml
+│   └── parameters.yaml
+└── dag/
+    ├── dag_data.json
+    └── dag_visualization.html
 ```
 
 ## Success Metrics
