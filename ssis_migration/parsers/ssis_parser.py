@@ -291,14 +291,174 @@ class SSISPackageParser:
         dependencies = []
         
         try:
-            # Look for PrecedenceConstraints - simplified approach
-            # Real implementation would need to traverse the full structure
-            pass
+            # Parse control flow dependencies (precedence constraints)
+            dependencies.extend(self._parse_control_flow_dependencies(parsed_dict))
+            
+            # Parse data flow dependencies (within data flow tasks)
+            dependencies.extend(self._parse_data_flow_dependencies(parsed_dict))
+            
+            # Parse package-level dependencies
+            dependencies.extend(self._parse_package_level_dependencies(parsed_dict))
             
         except Exception as e:
             self.logger.warning(f"Error parsing dependencies: {e}")
             
         return dependencies
+    
+    def _parse_control_flow_dependencies(self, parsed_dict: dict) -> List[Dict[str, str]]:
+        """Parse control flow dependencies (precedence constraints)"""
+        dependencies = []
+        
+        try:
+            # Navigate to the main executable
+            executable = parsed_dict.get('DTS:Executable', {})
+            
+            # Look for precedence constraints in the main executable
+            self._extract_precedence_constraints(executable, dependencies)
+            
+            # Look for precedence constraints in nested executables
+            exec_section = executable.get('DTS:Executables', {})
+            if exec_section:
+                exec_list = exec_section.get('DTS:Executable', [])
+                if not isinstance(exec_list, list):
+                    exec_list = [exec_list]
+                    
+                for exec_item in exec_list:
+                    if isinstance(exec_item, dict):
+                        self._extract_precedence_constraints(exec_item, dependencies)
+                        
+        except Exception as e:
+            self.logger.warning(f"Error parsing control flow dependencies: {e}")
+            
+        return dependencies
+    
+    def _parse_data_flow_dependencies(self, parsed_dict: dict) -> List[Dict[str, str]]:
+        """Parse data flow dependencies (within data flow tasks)"""
+        dependencies = []
+        
+        try:
+            executable = parsed_dict.get('DTS:Executable', {})
+            exec_section = executable.get('DTS:Executables', {})
+            
+            if exec_section:
+                exec_list = exec_section.get('DTS:Executable', [])
+                if not isinstance(exec_list, list):
+                    exec_list = [exec_list]
+                    
+                for exec_item in exec_list:
+                    if isinstance(exec_item, dict):
+                        creation_name = exec_item.get('@DTS:CreationName', '')
+                        if 'Pipeline' in creation_name or 'DataFlow' in creation_name:
+                            # Extract dependencies within this data flow
+                            self._extract_data_flow_paths(exec_item, dependencies)
+                            
+        except Exception as e:
+            self.logger.warning(f"Error parsing data flow dependencies: {e}")
+            
+        return dependencies
+    
+    def _parse_package_level_dependencies(self, parsed_dict: dict) -> List[Dict[str, str]]:
+        """Parse package-level dependencies (execute package tasks, etc.)"""
+        dependencies = []
+        
+        try:
+            executable = parsed_dict.get('DTS:Executable', {})
+            exec_section = executable.get('DTS:Executables', {})
+            
+            if exec_section:
+                exec_list = exec_section.get('DTS:Executable', [])
+                if not isinstance(exec_list, list):
+                    exec_list = [exec_list]
+                    
+                for exec_item in exec_list:
+                    if isinstance(exec_item, dict):
+                        creation_name = exec_item.get('@DTS:CreationName', '')
+                        if 'ExecutePackage' in creation_name:
+                            # This is an execute package task - creates package dependency
+                            self._extract_package_dependencies(exec_item, dependencies)
+                            
+        except Exception as e:
+            self.logger.warning(f"Error parsing package-level dependencies: {e}")
+            
+        return dependencies
+    
+    def _extract_precedence_constraints(self, executable: dict, dependencies: List[Dict[str, str]]):
+        """Extract precedence constraints from an executable"""
+        try:
+            # Look for PrecedenceConstraints section
+            constraints_section = executable.get('DTS:PrecedenceConstraints', {})
+            if constraints_section:
+                constraints_list = constraints_section.get('DTS:PrecedenceConstraint', [])
+                if not isinstance(constraints_list, list):
+                    constraints_list = [constraints_list]
+                    
+                for constraint in constraints_list:
+                    if isinstance(constraint, dict):
+                        dep_info = {
+                            'type': 'control_flow',
+                            'from': constraint.get('@DTS:From', ''),
+                            'to': constraint.get('@DTS:To', ''),
+                            'logicalAnd': constraint.get('@DTS:LogicalAnd', 'True'),
+                            'value': constraint.get('@DTS:Value', 'Success'),
+                            'expression': constraint.get('@DTS:Expression', ''),
+                            'evalOp': constraint.get('@DTS:EvalOp', 'Constraint')
+                        }
+                        dependencies.append(dep_info)
+        except Exception as e:
+            self.logger.warning(f"Error extracting precedence constraints: {e}")
+    
+    def _extract_data_flow_paths(self, executable: dict, dependencies: List[Dict[str, str]]):
+        """Extract data flow paths from a data flow task"""
+        try:
+            object_data = executable.get('DTS:ObjectData', {})
+            if isinstance(object_data, dict):
+                pipeline = object_data.get('pipeline', {})
+                if isinstance(pipeline, dict):
+                    paths = pipeline.get('paths', {})
+                    if isinstance(paths, dict):
+                        path_list = paths.get('path', [])
+                        if not isinstance(path_list, list):
+                            path_list = [path_list]
+                            
+                        for path in path_list:
+                            if isinstance(path, dict):
+                                dep_info = {
+                                    'type': 'data_flow',
+                                    'from': path.get('@startId', ''),
+                                    'to': path.get('@endId', ''),
+                                    'path_id': path.get('@id', ''),
+                                    'path_name': path.get('@name', ''),
+                                    'task_name': executable.get('@DTS:ObjectName', '')
+                                }
+                                dependencies.append(dep_info)
+        except Exception as e:
+            self.logger.warning(f"Error extracting data flow paths: {e}")
+    
+    def _extract_package_dependencies(self, executable: dict, dependencies: List[Dict[str, str]]):
+        """Extract package dependencies from execute package tasks"""
+        try:
+            object_data = executable.get('DTS:ObjectData', {})
+            if isinstance(object_data, dict):
+                # Look for package reference
+                package_name = ''
+                connection = ''
+                
+                # Try to find package name from various possible locations
+                if 'ExecutePackageTask' in str(object_data):
+                    package_name = object_data.get('PackageName', '')
+                    connection = object_data.get('Connection', '')
+                
+                if package_name or connection:
+                    dep_info = {
+                        'type': 'package_dependency',
+                        'from': executable.get('@DTS:ObjectName', ''),
+                        'to': package_name or connection,
+                        'task_name': executable.get('@DTS:ObjectName', ''),
+                        'creation_name': executable.get('@DTS:CreationName', '')
+                    }
+                    dependencies.append(dep_info)
+        except Exception as e:
+            self.logger.warning(f"Error extracting package dependencies: {e}")
         
     def _extract_connection_string_dict(self, conn_mgr: dict) -> str:
         """Extract connection string from connection manager dictionary"""
