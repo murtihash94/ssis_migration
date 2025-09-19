@@ -126,6 +126,14 @@
                         </button>
                     </li>
                     {% endif %}
+                    {% if results.transformation_data %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="comparison-tab" data-bs-toggle="tab" 
+                                data-bs-target="#comparison" type="button" role="tab">
+                            <i class="fas fa-code-compare"></i> Transformation Comparison
+                        </button>
+                    </li>
+                    {% endif %}
                     {% if results.dag_data %}
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="dag-tab" data-bs-toggle="tab" 
@@ -332,6 +340,71 @@
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Transformation Comparison Tab -->
+                    {% if results.transformation_data %}
+                    <div class="tab-pane fade" id="comparison" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-code-compare"></i> Transformation Comparison</h5>
+                                <p class="mb-0 text-muted">Compare original SSIS code with converted Databricks Live Tables code</p>
+                            </div>
+                            <div class="card-body">
+                                <!-- Object Selection Dropdown -->
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="object-selector" class="form-label">Select Transformed Object:</label>
+                                        <select class="form-select" id="object-selector" onchange="loadTransformationComparison()">
+                                            <option value="">Choose an object...</option>
+                                            {% for object_name, object_data in results.transformation_data.items() %}
+                                            <option value="{{ object_name }}">{{ object_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 d-flex align-items-end">
+                                        <button class="btn btn-success" id="update-code-btn" onclick="updateDatabricksCode()" disabled>
+                                            <i class="fas fa-save"></i> Update Code
+                                        </button>
+                                        <span class="ms-2" id="update-status"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Code Comparison -->
+                                <div class="row" id="comparison-content" style="display: none;">
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header bg-primary text-white">
+                                                <h6 class="mb-0"><i class="fas fa-cube"></i> Original SSIS Package Code</h6>
+                                            </div>
+                                            <div class="card-body p-0">
+                                                <pre class="m-0" style="max-height: 500px; overflow-y: auto;"><code id="ssis-code" class="language-xml"></code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0"><i class="fas fa-cloud"></i> Databricks Live Tables Code</h6>
+                                                <span id="human-updated-indicator" style="display: none;">
+                                                    <i class="fas fa-check-circle text-light"></i> Human Updated
+                                                </span>
+                                            </div>
+                                            <div class="card-body p-0">
+                                                <textarea id="dlt-code-editor" class="form-control" style="height: 500px; font-family: 'Courier New', monospace; border: none; border-radius: 0;" onchange="enableUpdateButton()"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Instructions -->
+                                <div class="alert alert-info mt-3" id="instructions">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Instructions:</strong> Select a transformed object from the dropdown above to view the side-by-side comparison of SSIS package code and the converted Databricks Live Tables code. You can edit the Databricks code and click "Update Code" to save your changes.
                                 </div>
                             </div>
                         </div>
@@ -844,6 +917,114 @@
                 }, 3000);
             }
         });
+        {% endif %}
+
+        // Transformation Comparison functionality
+        {% if results.transformation_data %}
+        let currentSelectedObject = null;
+        let transformationData = {{ results.transformation_data | tojson }};
+        let updatedObjects = new Set();
+
+        function loadTransformationComparison() {
+            const selector = document.getElementById('object-selector');
+            const selectedObject = selector.value;
+            const comparisonContent = document.getElementById('comparison-content');
+            const instructions = document.getElementById('instructions');
+            const updateBtn = document.getElementById('update-code-btn');
+            const updateStatus = document.getElementById('update-status');
+            const humanUpdatedIndicator = document.getElementById('human-updated-indicator');
+
+            if (!selectedObject) {
+                comparisonContent.style.display = 'none';
+                instructions.style.display = 'block';
+                updateBtn.disabled = true;
+                return;
+            }
+
+            currentSelectedObject = selectedObject;
+            const objectData = transformationData[selectedObject];
+
+            // Show comparison content
+            comparisonContent.style.display = 'block';
+            instructions.style.display = 'none';
+
+            // Load SSIS code
+            document.getElementById('ssis-code').textContent = objectData.ssis_code || 'No SSIS code available';
+
+            // Load DLT code
+            document.getElementById('dlt-code-editor').value = objectData.dlt_code || '';
+
+            // Show human updated indicator if this object was updated
+            if (updatedObjects.has(selectedObject)) {
+                humanUpdatedIndicator.style.display = 'inline';
+            } else {
+                humanUpdatedIndicator.style.display = 'none';
+            }
+
+            // Enable syntax highlighting
+            if (window.Prism) {
+                window.Prism.highlightAll();
+            }
+
+            updateBtn.disabled = false;
+            updateStatus.innerHTML = '';
+        }
+
+        function enableUpdateButton() {
+            const updateBtn = document.getElementById('update-code-btn');
+            if (currentSelectedObject) {
+                updateBtn.disabled = false;
+            }
+        }
+
+        function updateDatabricksCode() {
+            if (!currentSelectedObject) return;
+
+            const codeEditor = document.getElementById('dlt-code-editor');
+            const updateBtn = document.getElementById('update-code-btn');
+            const updateStatus = document.getElementById('update-status');
+            const humanUpdatedIndicator = document.getElementById('human-updated-indicator');
+
+            updateBtn.disabled = true;
+            updateStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+
+            // Simulate API call to update the code
+            fetch('/update_transformation_code/{{ session_id }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    object_name: currentSelectedObject,
+                    updated_code: codeEditor.value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updatedObjects.add(currentSelectedObject);
+                    humanUpdatedIndicator.style.display = 'inline';
+                    updateStatus.innerHTML = '<i class="fas fa-check-circle text-success"></i> Updated successfully!';
+                    
+                    // Update the transformation data
+                    transformationData[currentSelectedObject].dlt_code = codeEditor.value;
+                    transformationData[currentSelectedObject].human_updated = true;
+                    
+                    setTimeout(() => {
+                        updateStatus.innerHTML = '';
+                    }, 3000);
+                } else {
+                    updateStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Update failed';
+                }
+            })
+            .catch(error => {
+                console.error('Error updating code:', error);
+                updateStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Error updating code';
+            })
+            .finally(() => {
+                updateBtn.disabled = false;
+            });
+        }
         {% endif %}
     </script>
 </body>
