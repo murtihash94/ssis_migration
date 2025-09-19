@@ -8,6 +8,7 @@ import json
 import logging
 import tempfile
 import zipfile
+import time
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file, flash, redirect, url_for
 from werkzeug.utils import secure_filename
@@ -169,6 +170,50 @@ def view_results(session_id):
         dag_html_file = session_output_dir / "dag" / "dag_visualization.html"
         if dag_html_file.exists():
             results_data['dag_html'] = dag_html_file.read_text()
+        
+        # Load transformation comparison data
+        transformation_data = {}
+        
+        # Load SSIS package files for comparison
+        session_upload_dir = UPLOAD_FOLDER / session_id
+        if session_upload_dir.exists():
+            # Get all .dtsx files
+            dtsx_files = list(session_upload_dir.glob('*.dtsx'))
+            
+            for dtsx_file in dtsx_files:
+                object_name = dtsx_file.stem
+                
+                # Read SSIS package content
+                try:
+                    with open(dtsx_file, 'r', encoding='utf-8', errors='ignore') as f:
+                        ssis_content = f.read()
+                except:
+                    ssis_content = "Unable to read SSIS file content"
+                
+                # Get corresponding DLT code (initially from the main pipeline file)
+                dlt_content = results_data.get('dlt_code', '')
+                
+                # Check if there's a transformation update file
+                updates_file = session_output_dir / 'transformation_updates.json'
+                human_updated = False
+                if updates_file.exists():
+                    try:
+                        with open(updates_file, 'r') as f:
+                            updates_data = json.load(f)
+                            if object_name in updates_data:
+                                dlt_content = updates_data[object_name].get('updated_code', dlt_content)
+                                human_updated = updates_data[object_name].get('human_updated', False)
+                    except:
+                        pass
+                
+                transformation_data[object_name] = {
+                    'ssis_code': ssis_content,
+                    'dlt_code': dlt_content,
+                    'human_updated': human_updated
+                }
+        
+        if transformation_data:
+            results_data['transformation_data'] = transformation_data
             
     except Exception as e:
         app.logger.error(f"Error loading results for session {session_id}: {str(e)}")
@@ -224,6 +269,58 @@ def download_file(session_id, file_path):
     except Exception as e:
         app.logger.error(f"Error downloading file {file_path} for session {session_id}: {str(e)}")
         return jsonify({'error': 'Failed to download file'}), 500
+
+@app.route('/update_transformation_code/<session_id>', methods=['POST'])
+def update_transformation_code(session_id):
+    """Update transformation code for a specific object"""
+    session_output_dir = OUTPUT_FOLDER / session_id
+    
+    if not session_output_dir.exists():
+        return jsonify({'error': 'Session not found'}), 404
+    
+    try:
+        data = request.get_json()
+        object_name = data.get('object_name')
+        updated_code = data.get('updated_code')
+        
+        if not object_name or updated_code is None:
+            return jsonify({'error': 'Missing object_name or updated_code'}), 400
+        
+        # Create/update the transformation updates file
+        updates_file = session_output_dir / 'transformation_updates.json'
+        updates_data = {}
+        
+        if updates_file.exists():
+            with open(updates_file, 'r') as f:
+                updates_data = json.load(f)
+        
+        updates_data[object_name] = {
+            'updated_code': updated_code,
+            'timestamp': str(os.path.getctime(updates_file) if updates_file.exists() else time.time()),
+            'human_updated': True
+        }
+        
+        with open(updates_file, 'w') as f:
+            json.dump(updates_data, f, indent=2)
+        
+        # Also update the actual DLT pipeline file if it exists
+        dlt_file = session_output_dir / "notebooks" / "dlt_pipeline.py"
+        if dlt_file.exists():
+            # Create a backup
+            backup_file = session_output_dir / "notebooks" / "dlt_pipeline_original.py"
+            if not backup_file.exists():
+                shutil.copy2(dlt_file, backup_file)
+            
+            # Update the file (simple replacement for now)
+            with open(dlt_file, 'w') as f:
+                f.write(updated_code)
+        
+        app.logger.info(f"Updated transformation code for {object_name} in session {session_id}")
+        return jsonify({'success': True, 'message': 'Code updated successfully'})
+        
+    except Exception as e:
+        app.logger.error(f"Error updating transformation code for session {session_id}: {str(e)}")
+        return jsonify({'error': f'Failed to update code: {str(e)}'}), 500
 
 @app.errorhandler(413)
 def too_large(e):
