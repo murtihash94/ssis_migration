@@ -22,11 +22,15 @@ This web application provides a user-friendly interface for migrating SSIS packa
 
 2. **Run the Web Application**:
    ```bash
+   # Using the convenience script (recommended)
+   python start_webapp.py
+   
+   # Or run directly
    python web_app.py
    ```
 
 3. **Access the Application**:
-   Open your browser and navigate to `http://localhost:5000`
+   Open your browser and navigate to `http://localhost:8080`
 
 4. **Upload SSIS Files**:
    - Click "Select SSIS Files" and choose your SSIS package files
